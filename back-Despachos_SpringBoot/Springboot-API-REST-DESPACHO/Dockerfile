@@ -1,0 +1,31 @@
+# --- Etapa 1: Construcción (Build) ---
+# Usamos una versión estable de Maven (3.9) y Java 17
+FROM maven:3.9-eclipse-temurin-17-alpine AS build
+WORKDIR /app
+
+# Oprimización: Primero copiamos solo el pom.xml para aprovechar la cache de dependencias
+COPY pom.xml .
+# Descargamos las dependencias sin compilar el código para acelerar futuras construcciones
+RUN mvn dependency:go-offline
+
+# Copiamos el código y compilamos saltando los tests
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+
+# --- Etapa 2: Producción (Run stage) ---
+# Usamos solo el JRE de Java 17 para mantener la imagen minúscula
+FROM eclipse-temurin:17-jre-alpine AS runner
+WORKDIR /app
+
+# Creacion de un usuario no root para mejorar la seguridad
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
+# Copiamos el .jar
+COPY --from=build /app/target/*.jar app.jar
+
+# Exponemos el puerto en el que corre la aplicación
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
