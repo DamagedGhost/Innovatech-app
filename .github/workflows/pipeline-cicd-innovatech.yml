@@ -30,10 +30,25 @@ jobs:
     # ==========================================
     # FASE 2: CONSTRUCCIÓN Y SUBIDA A ECR
     # ==========================================
-    - name: 4. Build y Push - Frontend a ECR
+# ==========================================
+    # FASE 2: CONSTRUCCIÓN Y SUBIDA A ECR
+    # ==========================================
+    - name: 4. Diagnóstico y Build - Frontend
       env:
         REGISTRY: ${{ steps.login-ecr.outputs.registry }}
       run: |
+        echo "=== 📍 ¿Dónde está parado el bot ahora mismo? ==="
+        pwd
+        
+        echo "=== 🗂️ Listando archivos en la raíz del repositorio ==="
+        ls -la
+        
+        echo "=== 🔍 Buscando todos los Dockerfile en el proyecto ==="
+        find . -name "Dockerfile"
+        
+        echo "========================================================"
+        
+        # Intento de compilación original
         cd front_despacho
         docker build -t $REGISTRY/innovatech-frontend:latest .
         docker push $REGISTRY/innovatech-frontend:latest
