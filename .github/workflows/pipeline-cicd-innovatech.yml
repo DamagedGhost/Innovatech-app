@@ -80,12 +80,12 @@ jobs:
 
         # 2. Despliegue de Microservicios
         docker run -d --name backend-ventas --restart unless-stopped --network innovatech-net \
-          -p 8081:8080 -e DB_ENDPOINT=db-mysql -e DB_PORT=3306 -e DB_NAME=innovatech_db \
+          -p 8080:8080 -e DB_ENDPOINT=db-mysql -e DB_PORT=3306 -e DB_NAME=innovatech_db \
           -e DB_USERNAME=__APP_USER__ -e DB_PASSWORD=__APP_PWD__ \
           __REGISTRY__/innovatech-ventas:__TAG__
 
         docker run -d --name backend-despachos --restart unless-stopped --network innovatech-net \
-          -p 8082:8080 -e DB_ENDPOINT=db-mysql -e DB_PORT=3306 -e DB_NAME=innovatech_db \
+          -p 8081:8080 -e DB_ENDPOINT=db-mysql -e DB_PORT=3306 -e DB_NAME=innovatech_db \
           -e DB_USERNAME=__APP_USER__ -e DB_PASSWORD=__APP_PWD__ \
           __REGISTRY__/innovatech-despachos:__TAG__
 
