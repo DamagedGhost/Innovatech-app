@@ -1,0 +1,130 @@
+name: CI/CD INNOVATECH - Despliegue Limpio y Aislado
+
+on:
+  push:
+    branches: [ "deploy" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # ==========================================
+    # FASE 1: PREPARACIÓN Y CREDENCIALES
+    # ==========================================
+    - name: 1. Checkout del código fuente
+      uses: actions/checkout@v3
+
+    - name: 2. Configurar credenciales temporales de AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: 3. Login en Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # ==========================================
+    # FASE 2: CONSTRUCCIÓN Y SUBIDA A ECR
+    # ==========================================
+    - name: 4. Build y Push - Frontend a ECR
+      env:
+        REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        cd front_despacho
+        docker build -t $REGISTRY/innovatech-frontend:latest .
+        docker push $REGISTRY/innovatech-frontend:latest
+
+    - name: 5. Build y Push - Backend Ventas a ECR
+      env:
+        REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        cd back-Ventas_Springboot/Springboot-API-REST
+        docker build -t $REGISTRY/innovatech-ventas:latest .
+        docker push $REGISTRY/innovatech-ventas:latest
+
+    - name: 6. Build y Push - Backend Despachos a ECR
+      env:
+        REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        cd back-Despachos_Springboot/Springboot-API-REST
+        docker build -t $REGISTRY/innovatech-despachos:latest .
+        docker push $REGISTRY/innovatech-despachos:latest
+
+    # ==========================================
+    # FASE 3: DESPLIEGUE SELECTIVO VÍA AWS SSM
+    # ==========================================
+    
+# -> En el Servidor de Backend: SOLO corren la BD y las APIs de Spring Boot
+    - name: 7. Desplegar Capa de Datos y Lógica (EC2_BACK_ID) sin Internet
+      run: |
+        # 1. El bot de Actions lee el archivo local y lo convierte a Base64 (una sola línea)
+        COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
+        
+        # 2. Enviamos el comando por SSM inyectando esa línea
+        aws ssm send-command \
+          --instance-ids ${{ secrets.EC2_BACK_ID }} \
+          --document-name "AWS-RunShellScript" \
+          --comment "Despliegue Offline de BD y Backends" \
+          --parameters '{"commands":[
+            "set -e",
+            "mkdir -p /home/ec2-user/innovatech-prod",
+            "cd /home/ec2-user/innovatech-prod",
+            
+            "# A) La EC2 recibe el texto cifrado de GitHub y lo transforma de nuevo a archivo",
+            "echo '"$COMPOSE_B64"' | base64 -d > docker-compose.yml",
+            
+            "# B) Inyectar variables de entorno",
+            "echo \"REGISTRY_URL=${{ steps.login-ecr.outputs.registry }}\" > .env",
+            "echo \"MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}\" >> .env",
+            "echo \"MYSQL_APP_USER=${{ secrets.MYSQL_APP_USER }}\" >> .env",
+            "echo \"MYSQL_APP_PASSWORD=${{ secrets.MYSQL_APP_PASSWORD }}\" >> .env",
+            
+            "# C) Login en ECR (SSM permite interactuar con servicios de AWS sin internet público)",
+            "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
+            
+            "# D) Encender SOLO BD y Backends",
+            "docker compose pull db-mysql backend-ventas backend-despachos",
+            "docker compose up -d db-mysql backend-ventas backend-despachos",
+            
+            "# E) Limpiar front si existiera",
+            "docker stop front-app || true && docker rm front-app || true"
+          ]}' \
+          --output text
+
+    # -> En el Servidor de Frontend: SOLO corre la imagen web
+    - name: 8. Desplegar Capa de Presentación (EC2_FRONT_ID) sin Internet
+      run: |
+        # Volvemos a generar el Base64 en este paso por si acaso
+        COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
+        
+        aws ssm send-command \
+          --instance-ids ${{ secrets.EC2_FRONT_ID }} \
+          --document-name "AWS-RunShellScript" \
+          --comment "Despliegue Offline del Frontend" \
+          --parameters '{"commands":[
+            "set -e",
+            "mkdir -p /home/ec2-user/innovatech-prod",
+            "cd /home/ec2-user/innovatech-prod",
+            
+            "# A) Decodificar archivo",
+            "echo '"$COMPOSE_B64"' | base64 -d > docker-compose.yml",
+            
+            "# B) Crear .env mínimo",
+            "echo \"REGISTRY_URL=${{ steps.login-ecr.outputs.registry }}\" > .env",
+            
+            "# C) Login en ECR privado",
+            "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
+            
+            "# D) Encender ÚNICAMENTE el frontend",
+            "docker compose pull frontend-app",
+            "docker compose up -d frontend-app",
+            
+            "# E) Limpieza de backends y bd en este servidor",
+            "docker stop back-ventas back-despachos innovatech-db || true",
+            "docker rm back-ventas back-despachos innovatech-db || true"
+          ]}' \
+          --output text
