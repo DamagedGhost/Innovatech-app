@@ -11,7 +11,7 @@ RUN mvn dependency:go-offline
 # Copiamos el código y compilamos saltando los tests
 COPY src ./src
 # Evitar logs innecesarios y acelerar la construcción al omitir los tests
-RUN mvn clean package -B -ntp -DskipTests
+RUN mvn clean package -B -ntp -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -DskipTests
 
 
 # --- Etapa 2: Producción (Run stage) ---
