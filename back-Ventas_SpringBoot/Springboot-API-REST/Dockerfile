@@ -10,7 +10,8 @@ RUN mvn dependency:go-offline
 
 # Copiamos el código y compilamos saltando los tests
 COPY src ./src
-RUN mvn clean package -DskipTests
+# Evitar logs innecesarios y acelerar la construcción al omitir los tests
+RUN mvn clean package -B -ntp -DskipTests
 
 
 # --- Etapa 2: Producción (Run stage) ---
