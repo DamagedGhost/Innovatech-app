@@ -42,7 +42,7 @@ export const TableCompras = () => {
   };
 
   const compras = async () => {
-    await axios.get("http://localhost:8080/api/v1/ventas", {
+    await axios.get("/api/v1/ventas", {
       headers:{
         'Content-Type': 'application/json',
         'Accept': 'application/json'
