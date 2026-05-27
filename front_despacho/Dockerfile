@@ -23,8 +23,7 @@ FROM nginx:alpine AS production
 # Descartamos todo el código fuente original y node_modules (capas limpias)
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Usando template para variables de entorno (conversación anterior)
-COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Exponemos el puerto estándar de Nginx
 EXPOSE 80
