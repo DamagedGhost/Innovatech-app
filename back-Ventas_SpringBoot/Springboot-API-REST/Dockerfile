@@ -19,14 +19,14 @@ RUN mvn clean package -B -ntp -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.
 FROM eclipse-temurin:17-jre-alpine AS runner
 WORKDIR /app
 
-# Creacion de un usuario no root para mejorar la seguridad
-RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
-
 # Copiamos el .jar
 COPY --from=build /app/target/*.jar app.jar
 
 # Exponemos el puerto en el que corre la aplicación
 EXPOSE 8080
+
+# Creacion de un usuario no root para mejorar la seguridad
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

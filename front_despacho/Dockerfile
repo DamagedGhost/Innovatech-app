@@ -28,5 +28,11 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Exponemos el puerto estándar de Nginx
 EXPOSE 80
 
+# Creamos un usuario no root para mejorar la seguridad
+RUN addgroup -S nginx && adduser -S nginx -G nginx
+
+# Cambiamos a ese usuario para ejecutar Nginx
+USER nginx:nginx
+
 # Comando para iniciar Nginx en primer plano
 CMD ["nginx", "-g", "daemon off;"]
