@@ -23,16 +23,18 @@ FROM nginx:alpine AS production
 # Descartamos todo el código fuente original y node_modules (capas limpias)
 COPY --from=build /app/dist /usr/share/nginx/html
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Usando template para variables de entorno (conversación anterior)
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 
 # Exponemos el puerto estándar de Nginx
 EXPOSE 80
 
-# Creamos un usuario no root para mejorar la seguridad
-RUN addgroup -S nginx && adduser -S nginx -G nginx
-
-# Cambiamos a ese usuario para ejecutar Nginx
-USER nginx:nginx
+# Ajustamos permisos para que Nginx pueda servir los archivos sin problemas
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown nginx:nginx /var/run/nginx.pid
 
 # Comando para iniciar Nginx en primer plano
 CMD ["nginx", "-g", "daemon off;"]
